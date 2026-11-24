@@ -65,20 +65,27 @@
   map.createPane('labels').style.zIndex = 650;
   map.getPane('labels').style.pointerEvents = 'none';
 
-  const loadJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url + ' ' + r.status); return r.json(); });
+  const badge = document.getElementById('badge');
+  const loadJSON =(url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url + ' ' + r.status); return r.json(); });
 
-  Promise.all([
-    loadJSON("{{ url_for('static', filename='geo/peru_contorno.geojson') }}"),
-    loadJSON("{{ url_for('static', filename='geo/peru_departamentos.geojson') }}"),
-    loadJSON("{{ url_for('api_events') }}"),
-  ]).then(([contorno, departamentos, payload]) => {
-    // Resto del mundo atenuado: rectángulo con Perú como hueco.
-    const rings = contorno.features[0].geometry.coordinates.map((poly) => poly[0].map(([x, y]) => [y, x]));
-    L.polygon([[[-60, -140], [-60, -10], [40, -10], [40, -140]], ...rings], {
-      pane: 'mask', renderer: L.svg({ padding: 3 }), stroke: false, fillColor: '#050a14', fillOpacity: 0.55, interactive: false,
-    }).addTo(map);
-    L.geoJSON(departamentos, { pane: 'borders', interactive: false, style: { color: '#7fb2e5', weight: 0.6, opacity: 0.28, fill: false } }).addTo(map);
-    L.polygon(rings, { pane: 'borders', interactive: false, color: '#5cc8ff', weight: 1.6, opacity: 0.95, fillColor: '#3b9dff', fillOpacity: 0.05 }).addTo(map);
+  // Las capas de límites son decorativas: si una falla, los eventos se muestran igual.
+  const warnings = [];
+  const optional = (url, draw) => loadJSON(url).then(draw).catch((err) => { console.warn(err); warnings.push(url.split('/').pop()); });
+  const borders = Promise.all([
+    optional("{{ url_for('static', filename='geo/peru_contorno.geojson') }}", (contorno) => {
+      // Resto del mundo atenuado: rectángulo con Perú como hueco.
+      const rings = contorno.features[0].geometry.coordinates.map((poly) => poly[0].map(([x, y]) => [y, x]));
+      L.polygon([[[-60, -140], [-60, -10], [40, -10], [40, -140]], ...rings], {
+        pane: 'mask', renderer: L.svg({ padding: 3 }), stroke: false, fillColor: '#050a14', fillOpacity: 0.55, interactive: false,
+      }).addTo(map);
+      L.polygon(rings, { pane: 'borders', interactive: false, color: '#5cc8ff', weight: 1.6, opacity: 0.95, fillColor: '#3b9dff', fillOpacity: 0.05 }).addTo(map);
+    }),
+    optional("{{ url_for('static', filename='geo/peru_departamentos.geojson') }}", (departamentos) => {
+      L.geoJSON(departamentos, { pane: 'borders', interactive: false, style: { color: '#7fb2e5', weight: 0.6, opacity: 0.28, fill: false } }).addTo(map);
+    }),
+  ]);
+
+  loadJSON("{{ url_for('api_events') }}").then((payload) => {
 
     // Eventos filtrados (ya vienen ordenados por magnitud: los grandes quedan encima).
     const range = F.cat in CATS ? CATS[F.cat] : [0, 10];
@@ -120,11 +127,13 @@
       return div;
     };
     legend.addTo(map);
-    document.getElementById('badge').textContent = `${rows.length.toLocaleString('es-PE')} eventos · ${F.desde}–${F.hasta}`;
+    badge.textContent = `${rows.length.toLocaleString('es-PE')} eventos · ${F.desde}–${F.hasta}`;
     document.getElementById('loading').remove();
+    borders.then(() => { if (warnings.length) badge.title = 'No se pudieron cargar: ' + warnings.join(', '); });
   }).catch((err) => {
     console.error(err);
-    document.getElementById('loading').textContent = 'No se pudo cargar el mapa. Verifica la conexión a internet (mapa base) y que app.py esté en ejecución.';
+    badge.textContent = 'Sin eventos';
+    document.getElementById('loading').textContent = 'No se pudieron cargar los eventos (/api/eventos). Verifica que app.py esté en ejecución y revisa la consola.';
   });
 
   window.addEventListener('resize', () => map.invalidateSize());
