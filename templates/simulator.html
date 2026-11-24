@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_macros.html" import result_card, sim_fields with context %}
+{% block content %}
+<section class="grid sim-page">
+  <article class="card">
+    <header class="card-head"><h2>Datos del sismo hipotético</h2><span class="tag">KNN</span></header>
+    <form id="simulation-form" class="sim-form" method="post" novalidate>
+      {{ sim_fields(form) }}
+      {% if error %}<p class="form-error" role="alert">{{ error }}</p>{% else %}<p class="form-error" role="alert" hidden></p>{% endif %}
+      <button class="btn primary" type="submit"><svg><use href="#i-wave"/></svg><span>Estimar intensidad</span></button>
+    </form>
+    <p class="muted small">Rangos aceptados: magnitud {{ ranges.magnitud[0] }}–{{ ranges.magnitud[1] }} Mw, profundidad {{ ranges.profundidad_km[0]|int }}–{{ ranges.profundidad_km[1]|int }} km, distancia {{ ranges.distancia_km[0]|int }}–{{ ranges.distancia_km[1]|int }} km. El departamento es contexto: el modelo usa solo magnitud, profundidad y distancia.</p>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Resultado</h2></header>
+    {% if result %}{{ result_card(result) }}{% else %}
+    <p class="placeholder">Completa el formulario para ver la intensidad estimada, las probabilidades y los vecinos más cercanos.</p>{% endif %}
+  </article>
+</section>
+{% if result %}
+<article class="card">
+  <header class="card-head"><h2>Los {{ result.k }} eventos IGP más parecidos (entrenamiento)</h2><span class="muted">Distancia en el espacio escalado</span></header>
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Evento</th><th>Fecha</th><th>Localidad</th><th>Magnitud</th><th>Profundidad</th><th>Distancia</th><th>Intensidad</th><th>Distancia KNN</th></tr></thead>
+    <tbody>{% for n in result.neighbors %}<tr><td>{{ loop.index }}</td><td>{{ n.evento_id }}</td><td>{{ n.fecha }}</td><td>{{ n.localidad }}</td><td>{{ '%.1f' % n.magnitud }} Mw</td><td>{{ n.profundidad_km|int }} km</td><td>{{ '%.1f' % n.distancia_km }} km</td><td><span class="pill" style="--c: {{ label_colors[n.intensidad] }}">{{ n.intensidad_nombre }}</span></td><td>{{ n.distancia_punto }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</article>
+{% endif %}
+{% endblock %}

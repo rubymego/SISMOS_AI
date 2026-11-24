@@ -1,0 +1,78 @@
+{% macro result_card(result) -%}
+<div class="result-card" style="--accent: {{ result.color }}">
+  <div class="result-head">
+    <span class="eyebrow">Intensidad estimada · K = {{ result.k }}</span>
+    <strong class="result-label">{{ result.label_name }}</strong>
+    <span class="result-range">Mercalli {{ result.predicted }}</span>
+  </div>
+  <div class="prob-list">
+    {% for label in labels %}
+    {% set p = result.probabilities.get(label, 0) %}
+    <div class="prob-row">
+      <span>{{ label_names[label] }} <small>{{ label }}</small></span>
+      <div class="bar"><i style="width: {{ '%.1f' % (p * 100) }}%; background: {{ label_colors[label] }}"></i></div>
+      <b>{{ '%.1f' % (p * 100) }}%</b>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="votes">Votos de los {{ result.k }} vecinos:
+    {% for label in labels %}<span class="vote" style="--c: {{ label_colors[label] }}">{{ label_names[label] }} {{ result.votes[label] }}</span>{% endfor %}
+  </p>
+  {% if result.fuera_de_rango %}
+  <p class="warn">Atención: {{ result.fuera_de_rango | join(', ') }} queda fuera del rango de los eventos de entrenamiento; la estimación es menos fiable.</p>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro confusion(matrix) -%}
+<div class="cm" role="table" aria-label="Matriz de confusión">
+  <div class="cm-corner">Real ↓ / Pred. →</div>
+  {% for label in labels %}<div class="cm-head">{{ label_names[label] }}<small>{{ label }}</small></div>{% endfor %}
+  {% set ns = namespace(max=1) %}
+  {% for row in matrix %}{% for v in row %}{% if v > ns.max %}{% set ns.max = v %}{% endif %}{% endfor %}{% endfor %}
+  {% for row in matrix %}
+    {% set r = loop.index0 %}
+    <div class="cm-head side">{{ label_names[labels[r]] }}<small>{{ labels[r] }}</small></div>
+    {% for v in row %}
+      {% set alpha = 0.18 + 0.72 * (v / ns.max) %}
+      <div class="cm-cell {{ 'ok' if loop.index0 == r else 'bad' }}" style="--a: {{ '%.2f' % alpha }}" title="Real {{ labels[r] }} · Predicho {{ labels[loop.index0] }}: {{ v }}">{{ v }}</div>
+    {% endfor %}
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro metric_cards() -%}
+<div class="metric-grid">
+  {% for key, name in [('accuracy', 'Exactitud'), ('precision_macro', 'Precisión'), ('recall_macro', 'Recall'), ('f1_macro', 'F1 macro')] %}
+  <div class="metric">
+    <span>{{ name }}</span>
+    <strong>{{ '%.1f' % (metrics[key] * 100) }}%</strong>
+    <div class="bar"><i style="width: {{ '%.1f' % (metrics[key] * 100) }}%"></i></div>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% macro sim_fields(form, compact=False) -%}
+<div class="fields {{ 'compact' if compact }}">
+  <label>Departamento
+    <select name="departamento">
+      {% for d in departments %}<option value="{{ d }}" {{ 'selected' if form.departamento == d }}>{{ d }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Magnitud (Mw)
+    <input type="number" name="magnitud" step="0.1" min="{{ ranges.magnitud[0] }}" max="{{ ranges.magnitud[1] }}" value="{{ form.magnitud }}" required inputmode="decimal">
+  </label>
+  <label>Profundidad (km)
+    <input type="number" name="profundidad_km" step="1" min="{{ ranges.profundidad_km[0] }}" max="{{ ranges.profundidad_km[1] }}" value="{{ form.profundidad_km }}" required inputmode="decimal">
+  </label>
+  <label>Distancia al epicentro (km)
+    <input type="number" name="distancia_km" step="1" min="{{ ranges.distancia_km[0] }}" max="{{ ranges.distancia_km[1] }}" value="{{ form.distancia_km }}" required inputmode="decimal">
+  </label>
+  <label>Vecinos (K)
+    <select name="k">
+      {% for k in [3, 5, 7, 9] %}<option value="{{ k }}" {{ 'selected' if form.k|string == k|string }}>K = {{ k }}{{ ' (óptimo)' if k == metrics.best_k }}</option>{% endfor %}
+    </select>
+  </label>
+</div>
+{%- endmacro %}

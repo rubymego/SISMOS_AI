@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confusion, metric_cards, sim_fields with context %}
+{% block content %}
+<section class="kpis">
+  <article class="kpi" style="--d: 0s"><div class="kpi-icon blue"><svg><use href="#i-pulse"/></svg></div>
+    <div><span>Total de eventos</span><strong data-count="{{ kpis.eventos }}" data-decimals="0">{{ kpis.eventos }}</strong><small>IGP 1960-2026 · {{ records }} registros</small></div></article>
+  <article class="kpi" style="--d: .08s"><div class="kpi-icon orange"><svg><use href="#i-gauge"/></svg></div>
+    <div><span>Magnitud promedio</span><strong data-count="{{ kpis.magnitud }}" data-decimals="2" data-suffix=" Mw">{{ kpis.magnitud }} Mw</strong><small>Eventos con M ≥ 5.0</small></div></article>
+  <article class="kpi" style="--d: .16s"><div class="kpi-icon cyan"><svg><use href="#i-depth"/></svg></div>
+    <div><span>Profundidad promedio</span><strong data-count="{{ kpis.profundidad }}" data-decimals="1" data-suffix=" km">{{ kpis.profundidad }} km</strong><small>Foco sísmico</small></div></article>
+  <article class="kpi" style="--d: .24s"><div class="kpi-icon green"><svg><use href="#i-pin"/></svg></div>
+    <div><span>Regiones analizadas</span><strong data-count="{{ kpis.regiones }}" data-decimals="0">{{ kpis.regiones }}</strong><small>24 departamentos y Callao</small></div></article>
+</section>
+
+<section class="grid dash-top">
+  <article class="card map-card">
+    <header class="card-head"><h2>Mapa de eventos sísmicos del Perú</h2><span class="muted small">{{ period }}</span><a class="link" href="{{ url_for('event_map') }}">Ver mapa completo →</a></header>
+    <div class="map-frame loading" data-loading>
+      <iframe src="{{ url_for('map_embed', compacto=1) }}" title="Mapa de eventos sísmicos del IGP" loading="lazy"></iframe>
+      <div class="spinner" aria-hidden="true"></div>
+    </div>
+  </article>
+
+  <article class="card sim-card">
+    <header class="card-head"><h2>Simulador de sismo</h2><span class="tag">KNN</span></header>
+    <form id="quick-sim" class="sim-form" action="{{ url_for('simulator') }}" method="post" novalidate data-api="{{ url_for('api_estimate') }}">
+      {{ sim_fields({'departamento': 'Huánuco', 'magnitud': '6.0', 'profundidad_km': '30', 'distancia_km': '25', 'k': metrics.best_k}, compact=True) }}
+      <p class="form-error" role="alert" hidden></p>
+      <button class="btn primary" type="submit"><svg><use href="#i-wave"/></svg><span>Estimar intensidad</span></button>
+    </form>
+    <div id="quick-result" class="quick-result" aria-live="polite">
+      <p class="placeholder">Ingresa los datos y pulsa <b>Estimar intensidad</b>. El resultado sale del modelo KNN entrenado.</p>
+    </div>
+  </article>
+</section>
+
+<section class="grid dash-bottom">
+  <article class="card">
+    <header class="card-head"><h2>Eventos por magnitud</h2></header>
+    <div class="chart donut"><canvas id="chart-magnitudes" aria-label="Dona de eventos por magnitud"></canvas>
+      <div class="donut-center"><strong>{{ kpis.eventos }}</strong><span>eventos</span></div></div>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Eventos por departamento</h2><span class="muted">Top 5 · localidad más cercana</span></header>
+    <div class="chart"><canvas id="chart-departamentos" aria-label="Barras de eventos por departamento"></canvas></div>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Matriz de confusión</h2><span class="muted">Prueba · K = {{ metrics.best_k }}</span></header>
+    {{ confusion(metrics.confusion_matrix) }}
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Rendimiento del modelo</h2><a class="link" href="{{ url_for('evaluation') }}">Detalle →</a></header>
+    {{ metric_cards() }}
+    <p class="muted small">{{ metrics.test_events }} eventos de prueba nunca vistos en entrenamiento · 0 eventos compartidos.</p>
+  </article>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.SISMO = { charts: {{ charts | tojson }}, labels: {{ labels | tojson }}, names: {{ label_names | tojson }}, colors: {{ label_colors | tojson }} };
+</script>
+{% endblock %}

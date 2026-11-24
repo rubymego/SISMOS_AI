@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<article class="card">
+  <form class="filters" method="get">
+    <label>Categoría de magnitud
+      <select name="cat">
+        <option value="Todas">Todas</option>
+        {% for c, txt in [('M50', '5.0 – 5.4'), ('M55', '5.5 – 5.9'), ('M60', '≥ 6.0')] %}<option value="{{ c }}" {{ 'selected' if filters.cat == c }}>{{ txt }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Magnitud mínima <input type="number" name="min" step="0.1" min="0" max="10" value="{{ filters.min }}"></label>
+    <label>Magnitud máxima <input type="number" name="max" step="0.1" min="0" max="10" value="{{ filters.max }}"></label>
+    <label>Desde (año) <input type="number" name="desde" step="1" min="{{ years[0] }}" max="{{ years[1] }}" value="{{ filters.desde }}"></label>
+    <label>Hasta (año) <input type="number" name="hasta" step="1" min="{{ years[0] }}" max="{{ years[1] }}" value="{{ filters.hasta }}"></label>
+    <button class="btn primary" type="submit">Aplicar filtros</button>
+    <a class="btn ghost" href="{{ url_for('event_map') }}">Restablecer</a>
+  </form>
+  <div class="map-frame tall loading" data-loading>
+    <iframe src="{{ url_for('map_embed', **filters) }}" title="Mapa de sismos de Perú" allowfullscreen></iframe>
+    <div class="spinner" aria-hidden="true"></div>
+  </div>
+  <p class="muted small">Solo epicentros en Perú y su zona marina cercana · IGP 1960–2026, M ≥ 5.0 ({{ period }}). Pasa el mouse o haz clic en un punto para ver el detalle. Antes de 1990 los datos son menos precisos; por eso se usa M ≥ 5.0.</p>
+</article>
+{% endblock %}

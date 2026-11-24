@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid two">
+  <article class="card">
+    <header class="card-head"><h2>¿Cómo funciona el modelo?</h2></header>
+    <ol class="steps">
+      <li><b>Variables:</b> magnitud (Mw), profundidad (km) y distancia epicentral (km, Haversine).</li>
+      <li><b>Escalado:</b> <code>StandardScaler</code> para que ninguna variable domine por su rango.</li>
+      <li><b>Clasificador:</b> <code>KNeighborsClassifier</code> con pesos por distancia.</li>
+      <li><b>Separación:</b> 80/20 agrupada por evento (<code>GroupShuffleSplit</code>): {{ metrics.train_events }} eventos de entrenamiento y {{ metrics.test_events }} de prueba, <b>{{ metrics.shared_events }} compartidos</b>.</li>
+      <li><b>Selección de K:</b> 3, 5, 7 y 9 con <code>GroupKFold</code> (5 pliegues) solo sobre entrenamiento; criterio F1 macro.</li>
+    </ol>
+    <div class="best-k"><span>K elegido</span><strong>{{ metrics.best_k }}</strong></div>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Validación cruzada por K</h2></header>
+    <div class="chart"><canvas id="chart-k" aria-label="F1 macro por valor de K"></canvas></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>K</th><th>F1 macro CV</th><th>Desviación</th><th>Exactitud CV</th></tr></thead>
+      <tbody>{% for s in metrics.cv_scores %}<tr class="{{ 'hl' if s.k == metrics.best_k }}"><td>{{ s.k }}</td><td>{{ '%.4f' % s.f1_macro_cv }}</td><td>± {{ '%.4f' % s.f1_std_cv }}</td><td>{{ '%.4f' % s.accuracy_cv }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </article>
+</section>
+<article class="card">
+  <header class="card-head"><h2>Rangos de las variables en entrenamiento</h2></header>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Variable</th><th>Mínimo</th><th>Media</th><th>Máximo</th><th>Desv. estándar</th></tr></thead>
+    <tbody>{% for f in features %}<tr><td>{{ f }}</td><td>{{ train_stats[f]['min'] }}</td><td>{{ train_stats[f]['mean'] }}</td><td>{{ train_stats[f]['max'] }}</td><td>{{ train_stats[f]['std'] }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</article>
+{% endblock %}
+{% block scripts %}<script>window.SISMO = { cv: {{ metrics.cv_scores | tojson }}, bestK: {{ metrics.best_k }} };</script>{% endblock %}

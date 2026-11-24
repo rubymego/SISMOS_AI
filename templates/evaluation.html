@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import confusion, metric_cards with context %}
+{% block content %}
+<section class="grid two">
+  <article class="card"><header class="card-head"><h2>Métricas en prueba</h2><span class="muted">K = {{ metrics.best_k }} · {{ metrics.test_rows }} registros</span></header>{{ metric_cards() }}
+    <p class="muted small">La clase con más errores es <b>{{ label_names[confused_class] }} ({{ confused_class }})</b>. Las métricas miden la concordancia con la intensidad estimada, no con intensidades observadas.</p></article>
+  <article class="card"><header class="card-head"><h2>Matriz de confusión</h2></header>{{ confusion(matrix) }}</article>
+</section>
+<article class="card">
+  <header class="card-head"><h2>Reporte por clase</h2></header>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Clase</th><th>Precisión</th><th>Recall</th><th>F1</th><th>Soporte</th></tr></thead>
+    <tbody>{% for l in labels %}{% set r = class_report[l] %}<tr><td><span class="pill" style="--c: {{ label_colors[l] }}">{{ label_names[l] }} · {{ l }}</span></td><td>{{ '%.3f' % r.precision }}</td><td>{{ '%.3f' % r.recall }}</td><td>{{ '%.3f' % r['f1-score'] }}</td><td>{{ r.support|int }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+</article>
+<article class="card">
+  <header class="card-head"><h2>Distribución de clases en el dataset</h2></header>
+  <div class="chart"><canvas id="chart-classes" aria-label="Registros por clase"></canvas></div>
+</article>
+{% endblock %}
+{% block scripts %}<script>window.SISMO = { classCounts: {{ metrics.class_counts | tojson }}, names: {{ label_names | tojson }}, colors: {{ label_colors | tojson }} };</script>{% endblock %}

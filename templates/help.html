@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid two">
+  <article class="card">
+    <header class="card-head"><h2>Cómo usar la aplicación</h2></header>
+    <ol class="steps">
+      <li><b>Dashboard:</b> resumen de eventos IGP, mapa, simulador rápido y rendimiento.</li>
+      <li><b>Simulador:</b> ingresa magnitud, profundidad y distancia; elige K y pulsa «Estimar intensidad».</li>
+      <li><b>Mapa:</b> filtra epicentros por magnitud o por clase de intensidad estimada.</li>
+      <li><b>Dataset:</b> busca registros y descarga el CSV.</li>
+      <li><b>Evaluación y Reportes:</b> métricas, matriz de confusión, escenarios y el informe PDF.</li>
+    </ol>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Glosario</h2></header>
+    <dl class="glossary">
+      <dt>Magnitud (Mw)</dt><dd>Energía liberada en la fuente; un solo valor por sismo.</dd>
+      <dt>Intensidad (Mercalli)</dt><dd>Efectos en un lugar; varía con la distancia, la profundidad y el suelo.</dd>
+      <dt>KNN</dt><dd>Clasifica según los K ejemplos más parecidos del entrenamiento.</dd>
+      <dt>F1 macro</dt><dd>Promedio del F1 de las tres clases, sin favorecer a la más frecuente.</dd>
+    </dl>
+  </article>
+</section>
+<article class="card">
+  <header class="card-head"><h2>Fuente y limitaciones</h2></header>
+  <ul class="facts">
+    <li>Eventos: {{ fuente }}. Período: {{ period }}. Se eliminaron los sismos de Ecuador, Chile, Brasil, Bolivia y Colombia.</li>
+    <li>La intensidad <b>no</b> viene en el catálogo: se estima con una relación de atenuación didáctica más ruido. Por eso <code>tipo_dato = MIXTO</code>.</li>
+    <li>El modelo no considera suelo, construcciones ni población, y no predice fecha, lugar ni magnitud de sismos futuros.</li>
+    <li>Para información oficial consulta al IGP (igp.gob.pe) y al INDECI.</li>
+  </ul>
+</article>
+{% endblock %}

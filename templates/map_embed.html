@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa sísmico de Perú</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body, #map { height: 100%; margin: 0; background: #0b1220; }
+  body { font: 12px/1.45 "Inter", "Segoe UI", system-ui, sans-serif; color: #e6eefb; }
+  .leaflet-container { background: #0b1220; font: inherit; }
+  .leaflet-control-attribution { background: rgba(8, 16, 32, .75) !important; color: #8fa3c0 !important; font-size: 10px; }
+  .leaflet-control-attribution a { color: #9fd0ff !important; }
+  .leaflet-control-zoom a { background: #0e1b31 !important; color: #e6eefb !important; border-color: #2a4268 !important; }
+  .leaflet-control-scale-line { background: rgba(8, 16, 32, .7); color: #cfdcf0; border-color: #8fa3c0; }
+  .legend { background: rgba(9, 18, 36, .9); border: 1px solid #2a4268; border-radius: 10px; padding: 10px 12px; min-width: 150px; box-shadow: 0 8px 20px rgba(0,0,0,.4); }
+  .legend b { display: block; margin-bottom: 6px; font-size: 12px; }
+  .legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: #cfdcf0; }
+  .legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.35); }
+  .legend small { color: #8fa3c0; display: block; margin-top: 6px; }
+  .ocean { color: rgba(150, 190, 235, .55); font: italic 600 13px/1.2 "Segoe UI", sans-serif; letter-spacing: .35em; white-space: nowrap; text-align: center; pointer-events: none; }
+  .city { color: #fff; font-weight: 700; font-size: 11.5px; text-shadow: 0 1px 3px #000, 0 0 6px #000; white-space: nowrap; pointer-events: none; }
+  .city.hl { color: #7cc4ff; font-size: 13px; }
+  .huanuco-pulse { width: 16px; height: 16px; border-radius: 50%; background: #3b9dff; border: 2px solid #fff; box-shadow: 0 0 0 0 rgba(59,157,255,.7); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 12px rgba(59,157,255,0); } 100% { box-shadow: 0 0 0 0 rgba(59,157,255,0); } }
+  .leaflet-tooltip.quake, .leaflet-popup.quake .leaflet-popup-content-wrapper { background: rgba(10, 20, 40, .96); color: #e6eefb; border: 1px solid #2a4268; border-radius: 10px; box-shadow: 0 10px 24px rgba(0,0,0,.5); }
+  .leaflet-tooltip.quake::before { border-top-color: #2a4268; }
+  .leaflet-popup.quake .leaflet-popup-tip { background: rgba(10, 20, 40, .96); }
+  .card-q b { font-size: 13px; display: block; margin-bottom: 3px; }
+  .card-q span { color: #8fa3c0; }
+  .badge { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(9,18,36,.9); border: 1px solid #2a4268; border-radius: 999px; padding: 5px 11px; color: #cfdcf0; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1001; background: rgba(11,18,32,.6); color: #9fd0ff; font-weight: 600; }
+  .compact .legend { padding: 7px 9px; min-width: 0; font-size: 11px; }
+  .compact .legend small { display: none; }
+  @media (max-width: 520px) { .badge { display: none; } .legend { font-size: 10.5px; padding: 6px 8px; min-width: 0; } .legend small { display: none; } }
+  .compact .ocean { font-size: 10px; letter-spacing: .25em; }
+</style>
+</head>
+<body class="{{ 'compact' if compact }}">
+<div id="map" role="region" aria-label="Mapa de sismos de Perú"></div>
+<div class="badge" id="badge">Cargando…</div>
+<div class="loading" id="loading">Cargando eventos…</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+  const F = {{ filters | tojson }};
+  const CATS = { M50: [5, 5.5], M55: [5.5, 6], M60: [6, 10] };
+  const color = (m) => (m < 5.5 ? '#ffd23f' : m < 6 ? '#ff8c32' : '#ff3b4e');
+  const PERU = L.latLngBounds([-18.5, -81.5], [0.0, -68.5]);
+
+  const map = L.map('map', {
+    preferCanvas: true, minZoom: 4, maxZoom: 10, zoomSnap: 0.25,
+    maxBounds: L.latLngBounds([-23, -88], [4, -62]), maxBoundsViscosity: 1.0, worldCopyJump: false,
+  });
+  map.fitBounds(PERU, { padding: [6, 6] });
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 16, attribution: 'Mapa base &copy; <a href="https://www.esri.com" target="_blank" rel="noopener">Esri</a> · Datos: IGP',
+  }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+
+  // Panes: máscara < límites < puntos < etiquetas
+  map.createPane('mask').style.zIndex = 350;
+  map.createPane('borders').style.zIndex = 360;
+  map.createPane('quakes').style.zIndex = 450;
+  map.createPane('labels').style.zIndex = 650;
+  map.getPane('labels').style.pointerEvents = 'none';
+
+  const loadJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(url + ' ' + r.status); return r.json(); });
+
+  Promise.all([
+    loadJSON("{{ url_for('static', filename='geo/peru_contorno.geojson') }}"),
+    loadJSON("{{ url_for('static', filename='geo/peru_departamentos.geojson') }}"),
+    loadJSON("{{ url_for('api_events') }}"),
+  ]).then(([contorno, departamentos, payload]) => {
+    // Resto del mundo atenuado: rectángulo con Perú como hueco.
+    const rings = contorno.features[0].geometry.coordinates.map((poly) => poly[0].map(([x, y]) => [y, x]));
+    L.polygon([[[-60, -140], [-60, -10], [40, -10], [40, -140]], ...rings], {
+      pane: 'mask', renderer: L.svg({ padding: 3 }), stroke: false, fillColor: '#050a14', fillOpacity: 0.55, interactive: false,
+    }).addTo(map);
+    L.geoJSON(departamentos, { pane: 'borders', interactive: false, style: { color: '#7fb2e5', weight: 0.6, opacity: 0.28, fill: false } }).addTo(map);
+    L.polygon(rings, { pane: 'borders', interactive: false, color: '#5cc8ff', weight: 1.6, opacity: 0.95, fillColor: '#3b9dff', fillOpacity: 0.05 }).addTo(map);
+
+    // Eventos filtrados (ya vienen ordenados por magnitud: los grandes quedan encima).
+    const range = F.cat in CATS ? CATS[F.cat] : [0, 10];
+    const rows = payload.eventos.filter(([, , mag, , anio]) =>
+      mag >= F.min && mag <= F.max && mag >= range[0] && mag < range[1] && anio >= F.desde && anio <= F.hasta);
+    const counts = { M50: 0, M55: 0, M60: 0 };
+    const s = map.getZoom() < 5 ? 0.55 : map.getZoom() < 6 ? 0.8 : 1;  // puntos más pequeños en mapas chicos
+    const renderer = L.canvas({ pane: 'quakes', padding: 0.3, tolerance: 4 });
+    rows.forEach(([lat, lon, mag, prof, , fecha, zona, fuente, escala]) => {
+      counts[mag < 5.5 ? 'M50' : mag < 6 ? 'M55' : 'M60'] += 1;
+      const big = mag >= 6;
+      const html = `<div class="card-q"><b>${zona}</b>Magnitud: <b style="display:inline;color:${color(mag)}">${mag.toFixed(1)} ${escala}</b><br>`
+        + `Profundidad: ${Math.round(prof)} km<br>Fecha (UTC): ${fecha}<br><span>Fuente: ${fuente}</span></div>`;
+      L.circleMarker([lat, lon], {
+        renderer, radius: s * (big ? 3.4 + (mag - 6) * 2.2 : 1.8 + (mag - 5) * 1.6),
+        color: big ? '#ffffff' : color(mag), weight: big ? 0.8 : 0.4, opacity: big ? 0.9 : 0.5,
+        fillColor: color(mag), fillOpacity: big ? 0.7 : 0.55,
+      }).bindTooltip(html, { className: 'quake', direction: 'top', offset: [0, -4] })
+        .bindPopup(html, { className: 'quake', closeButton: false }).addTo(map);
+    });
+
+    // Etiquetas y ciudades
+    L.marker([-10.8, -81.6], { pane: 'labels', interactive: false, icon: L.divIcon({ className: 'ocean', html: 'OCÉANO<br>PACÍFICO', iconSize: [150, 34] }) }).addTo(map);
+    L.circleMarker([-12.0464, -77.0428], { pane: 'labels', radius: 4, color: '#fff', weight: 1.5, fillColor: '#cfdcf0', fillOpacity: 1, interactive: false }).addTo(map);
+    L.marker([-12.0464, -77.0428], { pane: 'labels', interactive: false, icon: L.divIcon({ className: 'city', html: 'Lima', iconSize: [40, 14], iconAnchor: [-6, 7] }) }).addTo(map);
+    L.marker([-9.9306, -76.2422], { zIndexOffset: 1000, icon: L.divIcon({ className: '', html: '<div class="huanuco-pulse"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }) })
+      .bindTooltip('<div class="card-q"><b>Huánuco</b>Localidad destacada del proyecto</div>', { className: 'quake', direction: 'top', offset: [0, -8] }).addTo(map);
+    L.marker([-9.9306, -76.2422], { pane: 'labels', interactive: false, icon: L.divIcon({ className: 'city hl', html: 'Huánuco', iconSize: [64, 16], iconAnchor: [-10, 8] }) }).addTo(map);
+
+    // Leyenda
+    const legend = L.control({ position: 'bottomleft' });
+    legend.onAdd = () => {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = '<b>Magnitud (Mw)</b>'
+        + `<div><i style="background:#ffd23f"></i>5.0 – 5.4 (${counts.M50})</div>`
+        + `<div><i style="background:#ff8c32"></i>5.5 – 5.9 (${counts.M55})</div>`
+        + `<div><i style="background:#ff3b4e"></i>≥ 6.0 (${counts.M60})</div>`
+        + '<small>IGP 1960–2026 · M ≥ 5.0</small>';
+      return div;
+    };
+    legend.addTo(map);
+    document.getElementById('badge').textContent = `${rows.length.toLocaleString('es-PE')} eventos · ${F.desde}–${F.hasta}`;
+    document.getElementById('loading').remove();
+  }).catch((err) => {
+    console.error(err);
+    document.getElementById('loading').textContent = 'No se pudo cargar el mapa. Verifica la conexión a internet (mapa base) y que app.py esté en ejecución.';
+  });
+
+  window.addEventListener('resize', () => map.invalidateSize());
+})();
+</script>
+</body>
+</html>

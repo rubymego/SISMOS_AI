@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import result_card with context %}
+{% block content %}
+<article class="card report-head">
+  <div><h2>Informe del proyecto</h2><p class="muted">PDF con metodología, datos del IGP, evaluación, escenarios y limitaciones.</p></div>
+  <a class="btn primary" href="{{ url_for('download_report') }}"><svg><use href="#i-download"/></svg><span>Descargar informe PDF</span></a>
+</article>
+<section class="grid three">
+  {% for s in scenarios %}
+  <article class="card scenario">
+    <header class="card-head"><h2>{{ loop.index }}. {{ s.title }}</h2></header>
+    <p class="inputs"><span>{{ s.departamento }}</span><span>M {{ s.magnitud }}</span><span>{{ s.profundidad_km }} km prof.</span><span>{{ s.distancia_km }} km dist.</span></p>
+    {{ result_card(s.result) }}
+    <p class="muted small">{{ s.interpretation }}</p>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

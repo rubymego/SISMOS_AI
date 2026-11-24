@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid two">
+  <article class="card">
+    <header class="card-head"><h2>Origen de los datos</h2><span class="tag">MIXTO</span></header>
+    <ul class="facts">
+      <li><b>Reales:</b> fecha UTC, latitud, longitud, magnitud y profundidad de {{ total_events }} eventos de Perú y su mar cercano (IGP, Catálogo de Sismos Instrumentales 1960–2026, solo M ≥ 5.0), {{ period }}. Antes de 1990 los datos son menos precisos; por eso se usa M ≥ 5.0.</li>
+      <li><b>Calculado:</b> distancia Haversine a las 3–5 localidades más cercanas ({{ total_rows }} registros evento-localidad).</li>
+      <li><b>Estimado:</b> intensidad Mercalli con una relación de atenuación y ruido con semilla fija. No es una observación.</li>
+      <li><b>Fuente:</b> {{ fuente }}.</li>
+    </ul>
+    <a class="btn ghost" href="{{ url_for('download_csv') }}"><svg><use href="#i-download"/></svg><span>Descargar sismos.csv</span></a>
+  </article>
+  <article class="card">
+    <header class="card-head"><h2>Resumen estadístico</h2></header>
+    <div class="table-wrap"><table>
+      <thead><tr><th></th><th>Magnitud</th><th>Profundidad (km)</th><th>Distancia (km)</th></tr></thead>
+      <tbody>{% for stat, name in [('min','Mínimo'),('mean','Media'),('50%','Mediana'),('max','Máximo')] %}<tr><td>{{ name }}</td><td>{{ summary['magnitud'][stat] }}</td><td>{{ summary['profundidad_km'][stat] }}</td><td>{{ summary['distancia_km'][stat] }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </article>
+</section>
+<article class="card">
+  <form class="filters" method="get">
+    <label class="grow">Buscar <input type="search" name="q" value="{{ query }}" placeholder="Evento, localidad, departamento, fecha…"></label>
+    <button class="btn primary" type="submit">Buscar</button>
+    {% if query %}<a class="btn ghost" href="{{ url_for('dataset_page') }}">Limpiar</a>{% endif %}
+  </form>
+  <p class="muted small">{{ matches }} registros encontrados · página {{ page_number }} de {{ pages }}</p>
+  <div class="table-wrap"><table class="dense">
+    <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for r in rows %}<tr>{% for c in columns %}<td>{% if c == 'intensidad' %}<span class="pill" style="--c: {{ label_colors[r[c]] }}">{{ r[c] }}</span>{% else %}{{ r[c] }}{% endif %}</td>{% endfor %}</tr>{% else %}<tr><td colspan="{{ columns|length }}">Sin resultados para «{{ query }}».</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <nav class="pager">
+    {% if page_number > 1 %}<a class="btn ghost" href="{{ url_for('dataset_page', q=query, page=page_number-1) }}">← Anterior</a>{% endif %}
+    {% if page_number < pages %}<a class="btn ghost" href="{{ url_for('dataset_page', q=query, page=page_number+1) }}">Siguiente →</a>{% endif %}
+  </nav>
+</article>
+{% endblock %}
